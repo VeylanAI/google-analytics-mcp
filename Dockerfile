@@ -1,33 +1,33 @@
-FROM python:3.11-slim
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    VIRTUAL_ENV=/opt/venv
+    UV_COMPILE_BYTECODE=1 \
+    UV_TOOL_BIN_DIR=/usr/local/bin
 
-ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
+WORKDIR /app
 
 ARG APP_USER=mcp
 ARG APP_UID=1000
 ARG APP_GID=1000
 
-ENV HOME=/home/${APP_USER}
 
-RUN python -m venv "${VIRTUAL_ENV}" \
-    && groupadd --system --gid "${APP_GID}" "$APP_USER" \
-    && useradd --system --uid "${APP_UID}" --gid "${APP_GID}" --home "${HOME}" --create-home "$APP_USER"
+RUN groupadd --system --gid "${APP_GID}" "$APP_USER" \
+    && useradd --system --uid "${APP_UID}" --gid "${APP_GID}" --create-home "$APP_USER"
 
-WORKDIR /app
+COPY pyproject.toml uv.lock ./
 
-COPY pyproject.toml README.md ./
-COPY analytics_mcp ./analytics_mcp
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --no-install-project --no-dev
 
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel \
-    && pip install --no-cache-dir .
+COPY . .
 
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --no-dev \
+    && chown -R "${APP_UID}:${APP_GID}" /app
 
-RUN chown -R "${APP_USER}":"${APP_USER}" /app "${VIRTUAL_ENV}"
+ENV PATH="/app/.venv/bin:${PATH}"
 
 USER $APP_USER
 
-CMD ["analytics-mcp"]
+CMD ["/app/.venv/bin/analytics-mcp"]
