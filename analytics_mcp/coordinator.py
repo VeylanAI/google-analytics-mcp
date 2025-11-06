@@ -23,4 +23,4 @@ from fastmcp import FastMCP
 from analytics_mcp.middleware import RequestEnvironmentMiddleware
 
 mcp = FastMCP("Google Analytics Server")
-mcp.add_middleware(RequestEnvironmentMiddleware)
+mcp.add_middleware(RequestEnvironmentMiddleware())

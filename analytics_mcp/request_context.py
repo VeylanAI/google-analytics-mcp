@@ -26,8 +26,7 @@ from typing import Any, Dict, Iterable, Mapping, Optional, TypedDict
 class RequestEnvironment(TypedDict, total=False):
     """Typed representation of the expected request environment payload."""
 
-    developer_token: str
-    login_customer_id: str
+    google_project_id: str
     refresh_token: str
     client_id: str
     client_secret: str

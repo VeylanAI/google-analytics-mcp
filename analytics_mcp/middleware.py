@@ -22,19 +22,23 @@ logger = logging.getLogger(__name__)
 _AUTH_TOKEN_ENV_KEY = "auth_token"
 _AUTH_TOKEN_ENV_VAR = "GOOGLE_ANALYTICS_MCP_AUTH_TOKEN"
 _AUTH_TOKENS_ENV_VAR = "GOOGLE_ANALYTICS_MCP_AUTH_TOKENS"
+_LEGACY_AUTH_TOKEN_ENV_VAR = "GOOGLE_ADS_MCP_AUTH_TOKEN"
+_LEGACY_AUTH_TOKENS_ENV_VAR = "GOOGLE_ADS_MCP_AUTH_TOKENS"
 
 
 def _load_allowed_tokens() -> Optional[Set[str]]:
     """Returns the configured set of allowed auth tokens, if any."""
     raw_tokens: list[str] = []
 
-    multi = os.environ.get(_AUTH_TOKENS_ENV_VAR)
-    if multi:
-        raw_tokens.extend(token.strip() for token in multi.split(","))
+    for env_var in (_AUTH_TOKENS_ENV_VAR, _LEGACY_AUTH_TOKENS_ENV_VAR):
+        multi = os.environ.get(env_var)
+        if multi:
+            raw_tokens.extend(token.strip() for token in multi.split(","))
 
-    single = os.environ.get(_AUTH_TOKEN_ENV_VAR)
-    if single:
-        raw_tokens.append(single.strip())
+    for env_var in (_AUTH_TOKEN_ENV_VAR, _LEGACY_AUTH_TOKEN_ENV_VAR):
+        single = os.environ.get(env_var)
+        if single:
+            raw_tokens.append(single.strip())
 
     tokens = {token for token in raw_tokens if token}
     return tokens or None
