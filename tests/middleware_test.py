@@ -18,6 +18,9 @@
 
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
 import json
 import os
 import unittest
@@ -28,6 +31,16 @@ from fastmcp.server.middleware import MiddlewareContext
 from mcp.types import CallToolRequestParams
 
 from analytics_mcp import middleware, request_context
+
+
+def _build_gateway_header(secret: str, payload: dict[str, Any]) -> str:
+    serialized = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode(
+        "utf-8"
+    )
+    signature = hmac.new(secret.encode("utf-8"), serialized, hashlib.sha256).digest()
+    encoded_payload = base64.urlsafe_b64encode(serialized).decode("ascii").rstrip("=")
+    encoded_signature = base64.urlsafe_b64encode(signature).decode("ascii").rstrip("=")
+    return f"v1 {encoded_payload}.{encoded_signature}"
 
 
 class RequestEnvironmentMiddlewareTest(unittest.IsolatedAsyncioTestCase):
@@ -90,6 +103,161 @@ class RequestEnvironmentMiddlewareTest(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual("ok", result)
         self.assertIsNone(request_context.get_request_environment())
+
+    async def test_gateway_header_missing_raises_error(self):
+        secret = "gateway-secret"
+        with mock.patch.dict(
+            os.environ,
+            {
+                "GOOGLE_ADS_MCP_AUTH_TOKENS": "shared-secret",
+                "VEYLAN_GATEWAY_SIGNING_SECRET": secret,
+            },
+            clear=False,
+        ):
+            params = CallToolRequestParams(
+                name="test",
+                arguments={},
+            )
+            request_body = {
+                "jsonrpc": "2.0",
+                "id": "test-id",
+                "method": "tools/call",
+                "params": {"name": "test", "arguments": {}, "environment": {}},
+            }
+
+            fake_request = mock.Mock()
+            fake_request._body = json.dumps(request_body).encode("utf-8")
+            fake_request.headers = {"Authorization": "Bearer shared-secret"}
+
+            fake_request_context = mock.Mock()
+            fake_request_context.request = fake_request
+
+            fake_fastmcp_context = mock.Mock()
+            fake_fastmcp_context.request_context = fake_request_context
+
+            context = MiddlewareContext(
+                message=params,
+                method="tools/call",
+                type="request",
+                fastmcp_context=fake_fastmcp_context,
+            )
+
+            async def call_next(inner_context: MiddlewareContext[Any]) -> str:
+                return "ok"
+
+            with self.assertLogs(middleware.logger, level="WARNING") as logs:
+                with self.assertRaises(PermissionError):
+                    await self.middleware.on_call_tool(context, call_next)
+
+        self.assertTrue(any("gateway_header_missing" in entry for entry in logs.output))
+
+    async def test_gateway_header_invalid_signature_is_rejected(self):
+        secret = "gateway-secret"
+        with mock.patch.dict(
+            os.environ,
+            {
+                "GOOGLE_ADS_MCP_AUTH_TOKENS": "shared-secret",
+                "VEYLAN_GATEWAY_SIGNING_SECRET": secret,
+            },
+            clear=False,
+        ):
+            params = CallToolRequestParams(
+                name="test",
+                arguments={},
+            )
+            request_body = {
+                "jsonrpc": "2.0",
+                "id": "test-id",
+                "method": "tools/call",
+                "params": {"name": "test", "arguments": {}, "environment": {}},
+            }
+
+            fake_request = mock.Mock()
+            fake_request._body = json.dumps(request_body).encode("utf-8")
+            fake_request.headers = {
+                "Authorization": "Bearer shared-secret",
+                "X-Veylan-Gateway": "v1 not-base64",
+            }
+
+            fake_request_context = mock.Mock()
+            fake_request_context.request = fake_request
+
+            fake_fastmcp_context = mock.Mock()
+            fake_fastmcp_context.request_context = fake_request_context
+
+            context = MiddlewareContext(
+                message=params,
+                method="tools/call",
+                type="request",
+                fastmcp_context=fake_fastmcp_context,
+            )
+
+            async def call_next(inner_context: MiddlewareContext[Any]) -> str:
+                return "ok"
+
+            with self.assertLogs(middleware.logger, level="WARNING") as logs:
+                with self.assertRaises(PermissionError):
+                    await self.middleware.on_call_tool(context, call_next)
+
+        self.assertTrue(any("gateway_header_invalid" in entry for entry in logs.output))
+
+    async def test_gateway_header_validates_allowed_services(self):
+        secret = "gateway-secret"
+        allowed_service = "analytics-service"
+        payload = {
+            "tenant": "tenant-123",
+            "service": allowed_service,
+            "version": 1,
+            "iat": 1735689600,
+        }
+        header_value = _build_gateway_header(secret, payload)
+
+        with mock.patch.dict(
+            os.environ,
+            {
+                "GOOGLE_ADS_MCP_AUTH_TOKENS": "shared-secret",
+                "VEYLAN_GATEWAY_SIGNING_SECRET": secret,
+                "VEYLAN_GATEWAY_ALLOWED_SERVICES": allowed_service,
+            },
+            clear=False,
+        ):
+            params = CallToolRequestParams(
+                name="test",
+                arguments={},
+            )
+            request_body = {
+                "jsonrpc": "2.0",
+                "id": "test-id",
+                "method": "tools/call",
+                "params": {"name": "test", "arguments": {}, "environment": {}},
+            }
+
+            fake_request = mock.Mock()
+            fake_request._body = json.dumps(request_body).encode("utf-8")
+            fake_request.headers = {
+                "Authorization": "Bearer shared-secret",
+                "X-Veylan-Gateway": header_value,
+            }
+
+            fake_request_context = mock.Mock()
+            fake_request_context.request = fake_request
+
+            fake_fastmcp_context = mock.Mock()
+            fake_fastmcp_context.request_context = fake_request_context
+
+            context = MiddlewareContext(
+                message=params,
+                method="tools/call",
+                type="request",
+                fastmcp_context=fake_fastmcp_context,
+            )
+
+            async def call_next(inner_context: MiddlewareContext[Any]) -> str:
+                return "ok"
+
+            result = await self.middleware.on_call_tool(context, call_next)
+
+        self.assertEqual("ok", result)
 
     async def test_missing_token_raises_error(self):
         with mock.patch.dict(

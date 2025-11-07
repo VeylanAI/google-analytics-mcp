@@ -57,6 +57,28 @@ _CLIENT_CACHE: ContextVar[Optional[_ClientCache]] = ContextVar(
 )
 
 
+class _RefreshTokenProxy:
+    """Adapter to expose a callable _refresh_token for user ADCs."""
+
+    __slots__ = ("_delegate",)
+
+    def __init__(self, delegate: google.auth.credentials.Credentials) -> None:
+        object.__setattr__(self, "_delegate", delegate)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._delegate, name)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        setattr(self._delegate, name, value)
+
+    def __delattr__(self, name: str) -> None:
+        delattr(self._delegate, name)
+
+    def _refresh_token(self, request: Any) -> None:
+        # Authorized user credentials only implement refresh(), so forward the call.
+        self._delegate.refresh(request)
+
+
 def _current_environment() -> Mapping[str, Any] | None:
     return request_context.get_request_environment()
 
@@ -126,6 +148,29 @@ _CLIENT_INFO = ClientInfo(
 _READ_ONLY_ANALYTICS_SCOPE = "https://www.googleapis.com/auth/analytics.readonly"
 
 
+def _ensure_impersonated_refresh_compat(
+    credentials: google.auth.credentials.Credentials,
+) -> google.auth.credentials.Credentials:
+    """Wrap impersonated credentials so refresh flows handle user ADCs."""
+    try:
+        from google.auth import impersonated_credentials  # type: ignore
+    except ImportError:
+        return credentials
+
+    if not isinstance(credentials, impersonated_credentials.Credentials):
+        return credentials
+
+    source_credentials = getattr(credentials, "_source_credentials", None)
+    if source_credentials is None:
+        return credentials
+
+    refresh_attr = getattr(source_credentials, "_refresh_token", None)
+    if isinstance(refresh_attr, str) and hasattr(source_credentials, "refresh"):
+        credentials._source_credentials = _RefreshTokenProxy(source_credentials)  # type: ignore[attr-defined]
+
+    return credentials
+
+
 def _create_credentials(
     environment: Mapping[str, Any] | None = None,
 ) -> google.auth.credentials.Credentials:
@@ -157,7 +202,7 @@ def _create_credentials(
                 exc,
             )
 
-    return credentials
+    return _ensure_impersonated_refresh_compat(credentials)
 
 
 def _credentials_fingerprint(environment: Mapping[str, Any] | None) -> str:
