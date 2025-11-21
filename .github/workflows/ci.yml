@@ -46,6 +46,7 @@ jobs:
       AWS_ROLE_ARN: arn:aws:iam::842990485259:role/github-actions-dev-app-deploy
       ECR_REGISTRY: 842990485259.dkr.ecr.us-east-1.amazonaws.com
       ECR_REPOSITORY: google-analytics-mcp
+      APP_NAME: google-analytics-mcp
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -76,6 +77,19 @@ jobs:
             ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ steps.meta.outputs.sha_tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - name: Notify platform-infrastructure of new image
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.PLATFORM_INFRASTRUCTURE_TOKEN }}
+          repository: ${{ github.repository_owner }}/platform-infrastructure
+          event-type: app_image_published
+          client-payload: |
+            {
+              "app": "${{ env.APP_NAME }}",
+              "version": "${{ steps.meta.outputs.sha_tag }}",
+              "env": "dev",
+              "ecr_repo": "${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}"
+            }
 
   deploy-production:
     name: Deploy Production
