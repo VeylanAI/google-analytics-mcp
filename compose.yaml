@@ -1,0 +1,12 @@
+services:
+  mcp:
+    build: .
+    env_file:
+      - .env
+    environment:
+      FASTMCP_HOST: 0.0.0.0
+      FASTMCP_PORT: 8001
+      FASTMCP_LOG_LEVEL: DEBUG
+      FASTMCP_DEBUG: "true"
+    ports:
+      - "127.0.0.1:8001:8001"

@@ -127,9 +127,7 @@ def get_metric_filter_hints():
             ),
         )
     )
-    not_filter = data_v1beta.FilterExpression(
-        not_expression=event_count_gt_10_filter
-    )
+    not_filter = data_v1beta.FilterExpression(not_expression=event_count_gt_10_filter)
     empty_filter = data_v1beta.FilterExpression(
         filter=data_v1beta.Filter(
             field_name="purchaseRevenue",
@@ -333,9 +331,7 @@ async def get_custom_dimensions_and_metrics(
         name=f"{construct_property_rn(property_id)}/metadata"
     )
     custom_metrics = [
-        proto_to_dict(metric)
-        for metric in metadata.metrics
-        if metric.custom_definition
+        proto_to_dict(metric) for metric in metadata.metrics if metric.custom_definition
     ]
     custom_dimensions = [
         proto_to_dict(dimension)

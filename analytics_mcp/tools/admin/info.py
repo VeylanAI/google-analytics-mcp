@@ -33,9 +33,7 @@ async def get_account_summaries() -> List[Dict[str, Any]]:
     # Uses an async list comprehension so the pager returned by
     # list_account_summaries retrieves all pages.
     summary_pager = await create_admin_api_client().list_account_summaries()
-    all_pages = [
-        proto_to_dict(summary_page) async for summary_page in summary_pager
-    ]
+    all_pages = [proto_to_dict(summary_page) async for summary_page in summary_pager]
     return all_pages
 
 
@@ -53,9 +51,7 @@ async def list_google_ads_links(property_id: int | str) -> List[Dict[str, Any]]:
     )
     # Uses an async list comprehension so the pager returned by
     # list_google_ads_links retrieves all pages.
-    links_pager = await create_admin_api_client().list_google_ads_links(
-        request=request
-    )
+    links_pager = await create_admin_api_client().list_google_ads_links(request=request)
     all_pages = [proto_to_dict(link_page) async for link_page in links_pager]
     return all_pages
 
@@ -69,9 +65,7 @@ async def get_property_details(property_id: int | str) -> Dict[str, Any]:
           - A string consisting of 'properties/' followed by a number
     """
     client = create_admin_api_client()
-    request = admin_v1beta.GetPropertyRequest(
-        name=construct_property_rn(property_id)
-    )
+    request = admin_v1beta.GetPropertyRequest(name=construct_property_rn(property_id))
     response = await client.get_property(request=request)
     return proto_to_dict(response)
 
@@ -100,7 +94,6 @@ async def list_property_annotations(
         )
     )
     all_pages = [
-        proto_to_dict(annotation_page)
-        async for annotation_page in annotations_pager
+        proto_to_dict(annotation_page) async for annotation_page in annotations_pager
     ]
     return all_pages

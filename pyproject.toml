@@ -12,7 +12,8 @@ dependencies = [
     "google-analytics-admin==0.26.0",
     "google-auth~=2.40",
     "mcp[cli]>=1.2.0",
-    "httpx>=0.28.1"
+    "httpx>=0.28.1",
+    "fastmcp>=2.13.0.2",
 ]
 keywords = [
     "google analytics",
@@ -58,3 +59,9 @@ dev = [
 [build-system]
 requires = ["setuptools>=69.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[dependency-groups]
+test = [
+    "pytest>=8.4.2",
+    "pytest-asyncio>=1.2.0",
+]

@@ -16,6 +16,7 @@
 
 from typing import Any, Dict, List
 
+from fastmcp.tools import Tool
 from analytics_mcp.coordinator import mcp
 from analytics_mcp.tools.utils import (
     construct_property_rn,
@@ -133,25 +134,19 @@ async def run_realtime_report(
     """
     request = data_v1beta.RunRealtimeReportRequest(
         property=construct_property_rn(property_id),
-        dimensions=[
-            data_v1beta.Dimension(name=dimension) for dimension in dimensions
-        ],
+        dimensions=[data_v1beta.Dimension(name=dimension) for dimension in dimensions],
         metrics=[data_v1beta.Metric(name=metric) for metric in metrics],
         return_property_quota=return_property_quota,
     )
 
     if dimension_filter:
-        request.dimension_filter = data_v1beta.FilterExpression(
-            dimension_filter
-        )
+        request.dimension_filter = data_v1beta.FilterExpression(dimension_filter)
 
     if metric_filter:
         request.metric_filter = data_v1beta.FilterExpression(metric_filter)
 
     if order_bys:
-        request.order_bys = [
-            data_v1beta.OrderBy(order_by) for order_by in order_bys
-        ]
+        request.order_bys = [data_v1beta.OrderBy(order_by) for order_by in order_bys]
 
     if limit:
         request.limit = limit
@@ -167,7 +162,9 @@ async def run_realtime_report(
 # provides the flexibility needed to generate the description while also
 # including the `run_realtime_report` method's docstring.
 mcp.add_tool(
-    run_realtime_report,
-    title="Run a Google Analytics realtime report using the Data API",
-    description=_run_realtime_report_description(),
+    Tool.from_function(
+        run_realtime_report,
+        title="Run a Google Analytics realtime report using the Data API",
+        description=_run_realtime_report_description(),
+    )
 )
